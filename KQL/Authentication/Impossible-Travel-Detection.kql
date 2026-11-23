@@ -1,1 +1,38 @@
 
+SigninLogs
+| where TimeGenerated > ago(24h)
+| where ResultType == "0"
+| extend Country = tostring(LocationDetails.countryOrRegion)
+| extend City = tostring(LocationDetails.city)
+| extend Latitude = todouble(LocationDetails.geoCoordinates.latitude)
+| extend Longitude = todouble(LocationDetails.geoCoordinates.longitude)
+| where isnotempty(UserPrincipalName)
+| where isnotempty(Country)
+| where isnotnull(Latitude) and isnotnull(Longitude)
+| project TimeGenerated, UserPrincipalName, IPAddress,
+          Country, City, Latitude, Longitude
+| sort by UserPrincipalName asc, TimeGenerated asc
+| serialize
+| extend PreviousUser = prev(UserPrincipalName)
+| extend PreviousTime = prev(TimeGenerated)
+| extend PreviousCountry = prev(Country)
+| extend PreviousCity = prev(City)
+| extend PreviousIP = prev(IPAddress)
+| extend PreviousLatitude = prev(Latitude)
+| extend PreviousLongitude = prev(Longitude)
+| where UserPrincipalName == PreviousUser
+| extend MinutesBetweenLogins = datetime_diff('minute', TimeGenerated, PreviousTime)
+| extend DistanceKm = geo_distance_2points(
+    PreviousLongitude, PreviousLatitude,
+    Longitude, Latitude
+) / 1000.0
+| extend RequiredSpeedKmh = DistanceKm / (MinutesBetweenLogins / 60.0)
+| where MinutesBetweenLogins between (1 .. 120)
+| where DistanceKm > 500
+| where RequiredSpeedKmh > 900
+| project TimeGenerated, UserPrincipalName,
+          PreviousCountry, PreviousCity, Country, City,
+          PreviousIP, IPAddress, MinutesBetweenLogins,
+          DistanceKm, RequiredSpeedKmh
+| order by RequiredSpeedKmh desc
+
