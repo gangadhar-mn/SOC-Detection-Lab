@@ -1,0 +1,12 @@
+
+SigninLogs
+| where TimeGenerated > ago(1h)
+| where ResultType != "0"
+| where isnotempty(IPAddress)
+| summarize
+    FailedAttempts = count(),
+    TargetedAccounts = dcount(UserPrincipalName),
+    AffectedUsers = make_set(UserPrincipalName, 10)
+    by IPAddress, bin(TimeGenerated, 5m)
+| where FailedAttempts >= 5
+| order by FailedAttempts desc
