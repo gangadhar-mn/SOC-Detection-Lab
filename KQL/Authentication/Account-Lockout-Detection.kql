@@ -1,0 +1,10 @@
+SigninLogs
+| where TimeGenerated > ago(24h)
+| where ResultType == "50053"
+| summarize
+    LockoutCount = count(),
+    SourceIPs = make_set(IPAddress, 10),
+    Applications = make_set(AppDisplayName, 10)
+    by UserPrincipalName, bin(TimeGenerated, 15m)
+| where LockoutCount >= 5
+| order by LockoutCount desc
