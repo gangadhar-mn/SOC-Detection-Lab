@@ -1,0 +1,15 @@
+SigninLogs
+| where TimeGenerated > ago(24h)
+| where ResultType != "0"
+| mv-expand AuthStep = AuthenticationDetails
+| extend
+    MFAResult = tostring(AuthStep.authenticationStepResultDetail),
+    AuthenticationMethod = tostring(AuthStep.authenticationMethod)
+| where MFAResult has_any ("denied", "declined", "fraud")
+| summarize
+    DeniedMFACount = count(),
+    MFAResponses = make_set(MFAResult, 10),
+    Applications = make_set(AppDisplayName, 10)
+    by UserPrincipalName, IPAddress, bin(TimeGenerated, 10m)
+| where DeniedMFACount >= 5
+| order by DeniedMFACount desc
